@@ -1,0 +1,81 @@
+version: '2.2'
+services:
+
+  elasticsearch: # <<< 1
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.8.1
+    ports:
+      - "9200:9200"
+    networks:
+      - elastic
+    environment:
+      - node.name=elasticsearch
+      - bootstrap.memory_lock=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - discovery.type=single-node
+
+  kibana: # <<< 2
+    image: docker.elastic.co/kibana/kibana:7.8.1
+    links:
+      - "elasticsearch"
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - elastic
+
+  fluentd: # <<< 3
+    build: ./fluentd
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+    links:
+      - "elasticsearch"
+    networks:
+      - elastic
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+
+  #######################################
+  # Kong : The API Gateway
+  #######################################
+  kong-gateway:
+    image: kong:latest
+    #image: kong:2.1.3
+    container_name: kong-gateway
+    networks:
+      - elastic
+    volumes:
+      - ./kong-configuration/kong_declarative_conf.yml:/usr/local/kong/declarative/kong.yml
+    environment:
+        KONG_DATABASE: "off"
+        KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+        KONG_PROXY_ACCESS_LOG: /dev/stdout
+        KONG_ADMIN_ACCESS_LOG: /dev/stdout
+        KONG_PROXY_ERROR_LOG: /dev/stderr
+        KONG_ADMIN_ERROR_LOG: /dev/stderr
+        KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+    restart: always
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8444:8444
+      - 8100:8100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://kong-gateway:8001"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+    links:
+      - fluentd
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: "docker.kong-gateway"
+
+networks:
+  elastic:
+    driver: bridge

@@ -1,0 +1,120 @@
+version: '3.7'
+
+networks:
+  kong-net:
+
+volumes:
+  kong_database:
+
+services:
+  #######################################
+  # Postgres: The database used by Kong
+  #######################################
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    networks:
+      - kong-net
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+    ports:
+      - "${POSTGRES_DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./database-script/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - kong_database:/var/lib/postgresql/data
+      #- ./datastore/konggw/postgres:/var/lib/postgresql/data
+
+  #######################################
+  # Kong database migration
+  #######################################
+  kong-migration:
+    image: kong:latest
+    container_name: kong-migration
+    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
+    networks:
+      - kong-net
+    restart: on-failure
+    environment:
+        KONG_PG_HOST: kong-database #container link name
+        KONG_PG_DATABASE: ${POSTGRES_DB_NAME}
+        KONG_PG_USER: ${POSTGRES_USER}
+        KONG_PG_PASSWORD: ${POSTGRES_PASSWORD}
+    links:
+      - kong-database
+    depends_on:
+      - kong-database
+
+  #######################################
+  # Kong : The API Gateway
+  #######################################
+  kong-gateway:
+    image: kong:latest
+    #image: kong:2.1.3
+    container_name: kong-gateway
+    networks:
+      - kong-net
+    # volumes:
+    #   - ./kong-configuration/kong_declarative_conf.yml:/usr/local/kong/declarative/kong.yml
+    environment:
+        KONG_DATABASE: postgres #Type of database
+        KONG_PG_HOST: kong-database #container link name
+        KONG_PG_DATABASE: ${POSTGRES_DB_NAME}
+        KONG_PG_USER: ${POSTGRES_USER}
+        KONG_PG_PASSWORD: ${POSTGRES_PASSWORD}
+        KONG_PROXY_ACCESS_LOG: ${KONG_PROXY_ACCESS_LOG}
+        KONG_ADMIN_ACCESS_LOG: ${KONG_ADMIN_ACCESS_LOG}
+        KONG_PROXY_ERROR_LOG: ${KONG_PROXY_ERROR_LOG}
+        KONG_ADMIN_ERROR_LOG: ${KONG_ADMIN_ERROR_LOG}
+        KONG_ADMIN_LISTEN: ${KONG_ADMIN_LISTEN}
+    restart: always
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8444:8444
+      - 8100:8100
+    links:
+      - kong-database
+    depends_on:
+      - kong-migration
+      - kong-database
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://kong-gateway:8001"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+
+  #######################################
+  # Konga
+  #######################################  
+  konga:
+    image: pantsel/konga
+    container_name: konga-admin
+    networks:
+      - kong-net
+    environment:
+        TOKEN_SECRET: ${KONGA_TOKEN_SECRET}
+        DB_ADAPTER: postgres
+        DB_PG_SCHEMA: postgres
+        DB_HOST: kong-database
+        DB_PORT: 5432
+        DB_DATABASE: db_konga
+        DB_USER: konga_adm
+        DB_PASSWORD: konga_adm
+        NODE_ENV: ${KONGA_ENV}
+        KONGA_HOOK_TIMEOUT: 10000
+    restart: always
+    ports:
+      - $KONGA_PORT:1337
+    links: 
+      - kong-database
+      - kong-gateway
+    depends_on:
+      - kong-database
