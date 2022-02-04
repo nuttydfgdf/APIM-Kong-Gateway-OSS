@@ -1,0 +1,37 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+- name: admin-api
+  url: http://127.0.0.1:8001
+  routes:
+    - paths:
+      - /admin-api
+  plugins:
+  - name: key-auth
+
+- name: httpbin-service
+  url: https://httpbin.org
+  routes:
+    - paths:
+      - /httpbin
+
+consumers:
+- username: admin
+  keyauth_credentials:
+  - key: secret
+
+plugins:
+- name: file-log
+  config:
+    path: /usr/local/kong/logs/file-log.log
+- name: correlation-id
+  config: 
+    header_name: "Kong-Request-ID"
+    generator: "uuid#counter"
+# - name: tcp-log
+#   config:
+#     host: logstash.local
+#     port: 5000
+#     timeout: 10000
+#     keepalive: 60000

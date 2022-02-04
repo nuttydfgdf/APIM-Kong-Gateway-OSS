@@ -1,0 +1,98 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+- name: admin-api
+  url: http://127.0.0.1:8001
+  routes:
+    - paths:
+      - /admin-api
+  plugins:
+  - name: key-auth
+#------------------------------------
+- name: httpbin-service
+  url: https://httpbin.org
+  routes:
+  - name: httpbin
+    paths:
+    - /httpbin
+  # Basic Authentication
+  - name: httpbin-basic-auth
+    paths:
+    - /httpbin/basic-auth
+  # HMAC Authentication https://docs.konghq.com/hub/kong-inc/hmac-auth/
+  - name: httpbin-hmac
+    paths:
+    - /httpbin/hmac
+  # Key Authentication https://docs.konghq.com/hub/kong-inc/key-auth/
+  - name: httpbin-key-auth
+    paths:
+    - /httpbin/key-auth
+  # JWT https://docs.konghq.com/hub/kong-inc/jwt/
+  - name: httpbin-jwt
+    paths:
+    - /httpbin/jwt
+
+# =====================================================
+# Create a Consumer
+consumers:
+- username: admin
+  keyauth_credentials:
+  - key: secret
+- username: nutsu
+  custom_id: '100000'
+# =====================================================
+# Create a Credential for Basic Authen
+basicauth_credentials:
+- consumer: nutsu
+  username: nutsu
+  password: '1234'
+# Create a Credential for Key Authentication(API Key)
+keyauth_credentials:
+- consumer: nutsu
+  key: 32c130e3-8289-480b-a3e3-d5695de38830
+# Create a JWT credential 
+jwt_secrets: 
+- consumer: nutsu
+  key: AaBbCc
+  algorithm: "RS256"
+  rsa_public_key: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo\n4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u\n+qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh\nkd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ\n0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg\ncKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc\nmwIDAQAB\n-----END PUBLIC KEY-----"
+  secret: "1234"
+
+# =====================================================
+plugins:
+- name: file-log
+  config:
+    path: /usr/local/kong/logs/file-log.log
+- name: correlation-id
+  config: 
+    header_name: "Kong-Request-ID"
+    generator: "uuid#counter"
+#------------------------------------
+- name: basic-auth
+  route: httpbin-basic-auth
+  config: 
+    hide_credentials: true
+#------------------------------------
+- name: hmac-auth
+  route: httpbin-hmac
+  config: 
+    hide_credentials: false
+    validate_request_body: false
+#------------------------------------
+- name: key-auth
+  route: httpbin-key-auth
+  config: 
+    key_names:
+    - apikey
+    key_in_body: false
+    key_in_header: true
+    key_in_query: false
+    hide_credentials: false
+    run_on_preflight: true
+#------------------------------------
+- name: jwt
+  route: httpbin-jwt
+  config: 
+    secret_is_base64: false
+    run_on_preflight: true

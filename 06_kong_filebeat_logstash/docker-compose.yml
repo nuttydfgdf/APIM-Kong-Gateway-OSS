@@ -1,0 +1,129 @@
+version: '3.7'
+
+networks:
+  kong-net:
+
+volumes:
+  filebeat:
+  database:
+  
+services:
+  #---------------------------------------------------------------------------------
+  # Postgres: The database used by Kong
+  #---------------------------------------------------------------------------------
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    networks:
+      - kong-net
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+    ports:
+      - "${POSTGRES_DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - database:/var/lib/postgresql/data
+      #- ./datastore/konggw/postgres:/var/lib/postgresql/data
+
+  #---------------------------------------------------------------------------------
+  # Konga
+  #---------------------------------------------------------------------------------
+  konga:
+    image: pantsel/konga
+    container_name: konga-admin
+    networks:
+      - kong-net
+    environment:
+        TOKEN_SECRET: ${KONGA_TOKEN_SECRET}
+        DB_ADAPTER: postgres
+        DB_PG_SCHEMA: postgres
+        DB_HOST: kong-database
+        DB_PORT: ${POSTGRES_DB_PORT}
+        DB_DATABASE: db_konga
+        DB_USER: konga_adm
+        DB_PASSWORD: konga_adm
+        NODE_ENV: ${KONGA_ENV}
+        KONGA_HOOK_TIMEOUT: 10000
+    restart: always
+    ports:
+      - $KONGA_PORT:1337
+    links: 
+      - kong-database
+      - kong-gateway
+    depends_on:
+      - kong-database
+
+  #---------------------------------------------------------------------------------
+  # Kong : The API Gateway
+  #---------------------------------------------------------------------------------
+  kong-gateway:
+    build: ./kong-build
+    image: kong-filebeat
+    container_name: kong-gateway
+    networks:
+      - kong-net
+    volumes:
+      - ./kong-configuration/kong_declarative_conf.yml:/usr/local/kong/declarative/kong.yml
+      - ./kong-configuration/kong.conf:/etc/kong/kong.conf
+      - filebeat:/filebeat/data
+    environment:
+        KONG_DATABASE: "off"
+        KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+        # KONG_LOG_LEVEL: "debug"
+        # KONG_PROXY_ACCESS_LOG: logs/access.log
+        # KONG_ADMIN_ACCESS_LOG: logs/admin_access.log
+        # KONG_PROXY_ERROR_LOG: logs/error.log 
+        # KONG_ADMIN_ERROR_LOG: logs/error.log 
+        # KONG_STATUS_ACCESS_LOG: "on"
+        KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+        env: QA
+        LOGSTASH_HOST: logstash.local
+        LOGSTASH_PORT: 5044
+        project: demoproject
+    links:
+      - "logstash:logstash.local"
+    restart: always
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8444:8444
+      - 8100:8100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://kong-gateway:8001"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+  #---------------------------------------------------------------------------------
+  # Logstash
+  #---------------------------------------------------------------------------------
+  logstash:
+    container_name: logstash
+    image: logstash-custom
+    build:
+      context: logstash/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    volumes:
+      # - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro,z
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro,z
+    ports:
+      - "5044:5044"
+      # - "5000:5000/tcp"
+      # - "5000:5000/udp"
+      - "9600:9600" #Logstash provides monitoring APIs: curl -XGET 'localhost:9600/?pretty'
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - kong-net
+    # depends_on:
+    #   - elasticsearch
+
+  
