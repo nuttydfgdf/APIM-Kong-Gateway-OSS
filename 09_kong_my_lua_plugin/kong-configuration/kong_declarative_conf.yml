@@ -10,4 +10,5 @@ services:
     - /httpbin
   plugins:
   - name: hello-world
+  - name: data-masking
 

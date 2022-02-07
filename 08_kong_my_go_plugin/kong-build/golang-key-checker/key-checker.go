@@ -20,12 +20,11 @@ func (conf Config) Access(kong *pdk.PDK) {
 		kong.Log.Err(err.Error())
 	}
 
-	kong.Response.AddHeader("Server", "NUTSU")
+	kong.Response.AddHeader("Server", "My Konggggggg!!!")
 
 	x := make(map[string][]string)
    	x["Content-Type"] = append(x["Content-Type"], "application/json")
    	if apiKey != key {
        kong.Response.Exit(403, "You have no correct key", x)
    	}
-
 }
