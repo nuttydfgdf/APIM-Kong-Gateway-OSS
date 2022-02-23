@@ -1,0 +1,26 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+- name: admin-api
+  url: http://127.0.0.1:8001
+  routes:
+    - paths:
+      - /admin-api
+  plugins:
+  - name: key-auth
+
+- name: httpbin-service
+  url: https://httpbin.org
+  routes:
+    - paths:
+      - /httpbin
+
+consumers:
+- username: admin
+  keyauth_credentials:
+  - key: secret
+
+# =====================================================
+plugins:
+- name: prometheus
