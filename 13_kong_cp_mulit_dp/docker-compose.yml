@@ -1,0 +1,124 @@
+version: '3.7'
+
+# docker network create --driver overlay ingress
+networks:
+  ingress:
+    external: true
+    name: ingress
+
+services:
+  # ------------------------------------------------------------
+  # Postgres: The database used by Kong
+  # ------------------------------------------------------------
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+    ports:
+      - "${POSTGRES_DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # volumes:
+      #- ./database-script/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # - kong_database:/var/lib/postgresql/data
+
+  # ------------------------------------------------------------
+  # Prepare the Kong database:
+  # ------------------------------------------------------------
+  kong-migration:
+    image: ${KONG_IMAGE_VERSION}
+    container_name: kong-migration
+    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
+    restart: on-failure
+    environment:
+        KONG_PG_HOST: kong-database #container link name
+        KONG_PG_DATABASE: ${POSTGRES_DB_NAME}
+        KONG_PG_USER: ${POSTGRES_USER}
+        KONG_PG_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # ------------------------------------------------------------
+  # Kong Control Plane
+  # ------------------------------------------------------------
+  kong-cp:
+    image: ${KONG_IMAGE_VERSION}
+    container_name: kong-cp
+    hostname: kong-cp
+    volumes:
+      - ./cert:/home/kong/cert
+    environment:
+        KONG_DATABASE: postgres #Type of database
+        KONG_PG_HOST: kong-database #container link name
+        KONG_PG_DATABASE: ${POSTGRES_DB_NAME}
+        KONG_PG_USER: ${POSTGRES_USER}
+        KONG_PG_PASSWORD: ${POSTGRES_PASSWORD}
+        KONG_PROXY_ACCESS_LOG: ${KONG_PROXY_ACCESS_LOG}
+        KONG_ADMIN_ACCESS_LOG: ${KONG_ADMIN_ACCESS_LOG}
+        KONG_PROXY_ERROR_LOG: ${KONG_PROXY_ERROR_LOG}
+        KONG_ADMIN_ERROR_LOG: ${KONG_ADMIN_ERROR_LOG}
+        KONG_ADMIN_LISTEN: ${KONG_ADMIN_LISTEN}
+        KONG_ADMIN_GUI_URL: http://localhost:8002
+        KONG_ROLE: control_plane
+        KONG_CLUSTER_CERT: /home/kong/cert/cluster.crt
+        KONG_CLUSTER_CERT_KEY: /home/kong/cert/cluster.key
+    restart: always
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8002:8002
+      - 8444:8444
+      - 8100:8100
+      - 8005:8005
+      - 8006:8006
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  # ------------------------------------------------------------
+  # Kong Data Plane
+  # ------------------------------------------------------------
+  kong-dp:
+    image: ${KONG_IMAGE_VERSION}
+    container_name: kong-dp
+    hostname: kong-dp-01
+    volumes:
+      - ./cert:/home/kong/cert
+    environment:
+        KONG_DATABASE: "off" #Type of database
+        KONG_PROXY_LISTEN: 0.0.0.0:8080
+        KONG_CLUSTER_CONTROL_PLANE: kong-cp:8005
+        KONG_CLUSTER_TELEMETRY_ENDPOINT: kong-cp:8006
+        KONG_ROLE: data_plane
+        KONG_CLUSTER_CERT: /home/kong/cert/cluster.crt
+        KONG_CLUSTER_CERT_KEY: /home/kong/cert/cluster.key
+    restart: always
+    ports:
+      - 8080:8080
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  #---------------------------------------------------------------------------------
+  # prometheus
+  #---------------------------------------------------------------------------------
+  # prometheus:
+  #   image: prom/prometheus:v2.33.3
+  #   networks:
+  #     - ingress
+  #   container_name: prometheus
+  #   volumes:
+  #     - ./prometheus-configuration/conf_prometheus.yml:/etc/prometheus/prometheus.yml
+  #     # - prometheus_data:/promtheus
+  #   command:
+  #    - '--config.file=/etc/prometheus/prometheus.yml'
+  #   ports:
+  #     - "9090:9090"
+  #   restart: always
+  #   links: 
+  #     - kong-gateway
