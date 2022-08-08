@@ -1,0 +1,34 @@
+# https://grafana.com/docs/agent/latest/configuration/create-config-file/
+
+server:
+  log_level: info
+  
+metrics:
+  wal_directory: /tmp/wal
+
+  global:
+  # PASTE PROMETHEUS global SECTION HERE
+    scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+    # How long to wait before timing out a scrape from a target.
+    scrape_timeout: 10s
+    external_labels:
+      environment: test-server
+
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        # basic_auth:
+        #   username: admin
+        #   password: secret-password
+
+  configs:
+    - name: agent
+      scrape_configs:
+        # PASTE scrape_configs SECTION HERE
+        - job_name: 'kong-service'
+          static_configs:
+            - targets: 
+              - kong-gateway:8001
+          metrics_path: '/metrics'
+
+      # remote_write:
+        # PASTE remote_write SECTION HERE

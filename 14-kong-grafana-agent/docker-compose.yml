@@ -1,0 +1,67 @@
+version: '3.7'
+
+networks:
+  kong-net:
+
+services:
+  #---------------------------------------------------------------------------------
+  # Kong : The API Gateway
+  #---------------------------------------------------------------------------------
+  kong-gateway:
+    image: kong:2.7.0-alpine
+    container_name: kong-gateway
+    networks:
+      - kong-net
+    volumes:
+      - ./kong-configuration/kong_declarative_conf.yml:/usr/local/kong/declarative/kong.yml
+    environment:
+        KONG_DATABASE: "off"
+        KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+        KONG_PROXY_ACCESS_LOG: /dev/stdout
+        KONG_ADMIN_ACCESS_LOG: /dev/stdout
+        KONG_PROXY_ERROR_LOG: /dev/stderr
+        KONG_ADMIN_ERROR_LOG: /dev/stderr
+        KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+    restart: always
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8444:8444
+      - 8100:8100
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://kong-gateway:8001"]
+    #   interval: 5s
+    #   timeout: 2s
+    #   retries: 15
+
+  #---------------------------------------------------------------------------------
+  # prometheus
+  #---------------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.33.3
+    networks:
+      - kong-net
+    container_name: prometheus
+    volumes:
+      - ./prometheus-configuration/conf_prometheus.yml:/etc/prometheus/prometheus.yml
+      # - prometheus_data:/promtheus
+    command:
+     - '--config.file=/etc/prometheus/prometheus.yml'
+     - '--web.enable-remote-write-receiver'
+    ports:
+      - "9090:9090"
+    restart: always
+    links: 
+      - kong-gateway
+
+  grafana-agent: 
+    image: grafana/agent:v0.23.0 
+    networks:
+      - kong-net
+    container_name: grafana-agent 
+    volumes:
+      - ./grafana-agent-configuration/agent.yaml:/etc/agent/agent.yaml
+    links: 
+      - kong-gateway
+      - prometheus
