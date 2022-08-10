@@ -35,9 +35,9 @@ services:
   # Kong database migration
   #######################################
   kong-migration:
-    image: kong:latest
+    image: kong/kong-gateway:2.8.0.0-alpine
     container_name: kong-migration
-    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
+    entrypoint: sh -c "sleep 10 && kong migrations up"
     networks:
       - kong-net
     restart: on-failure
@@ -55,8 +55,8 @@ services:
   # Kong : The API Gateway
   #######################################
   kong-gateway:
-    image: kong:latest
-    #image: kong:2.1.3
+    #image: kong:latest
+    image: kong/kong-gateway:2.8.0.0-alpine
     container_name: kong-gateway
     networks:
       - kong-net
@@ -74,11 +74,13 @@ services:
         KONG_PROXY_ERROR_LOG: ${KONG_PROXY_ERROR_LOG}
         KONG_ADMIN_ERROR_LOG: ${KONG_ADMIN_ERROR_LOG}
         KONG_ADMIN_LISTEN: ${KONG_ADMIN_LISTEN}
+        KONG_ADMIN_GUI_URL: http://localhost:8002
     restart: always
     ports:
       - 8000:8000
       - 8443:8443
       - 8001:8001
+      - 8002:8002
       - 8444:8444
       - 8100:8100
     links:
