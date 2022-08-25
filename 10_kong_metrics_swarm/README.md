@@ -9,6 +9,7 @@ docker network create --driver overlay ingress-routing
 Create the stack with docker stack deploy:
 ```
 docker stack deploy --compose-file docker-compose-stack.yml gateway
+docker stack deploy -c <(docker-compose config) kong
 ```
 
 Check that it’s running with docker stack services stackdemo:

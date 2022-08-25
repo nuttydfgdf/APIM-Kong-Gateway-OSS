@@ -37,7 +37,8 @@ services:
   kong-migration:
     image: kong/kong-gateway:2.8.0.0-alpine
     container_name: kong-migration
-    entrypoint: sh -c "sleep 10 && kong migrations up"
+    #entrypoint: sh -c "sleep 10 && kong migrations up"
+    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
     networks:
       - kong-net
     restart: on-failure

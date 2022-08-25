@@ -28,3 +28,6 @@ cd /usr/local/kong/logs
 tail -f /usr/local/kong/logs/error.log
 cat /usr/local/kong/logs/error.log
 tail -f /usr/local/kong/logs/access.log
+
+
+
