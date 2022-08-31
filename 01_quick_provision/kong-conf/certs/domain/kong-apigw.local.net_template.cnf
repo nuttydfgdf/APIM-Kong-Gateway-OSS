@@ -1,0 +1,20 @@
+[req]
+default_bits = 2048
+distinguished_name = req_distinguished_name
+req_extensions = v3_req 
+prompt = no 
+[req_distinguished_name] 
+C = TH
+ST = Bangkok
+L = Bangkok
+O = Nutsu Inc
+OU = Nutsu Dev
+CN = kong-apigw.local.net
+[v3_req] 
+keyUsage = keyEncipherment, dataEncipherment 
+extendedKeyUsage = serverAuth 
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kong-apigw.local.net
+DNS.2 = dev.nginx.net
+DNS.3 = dev.nginx.org

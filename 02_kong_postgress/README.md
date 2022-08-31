@@ -1,9 +1,21 @@
-
+real_ip_header
 
 # Run
 Before run remove volumn
 ```
 docker volume rm kong_database
+```
+# Kong Container
+docker-compose exec kong-gateway bash
+
+kong check -vv
+kong config
+
+kong start 
+kong stop
+kong health
+kong reload
+kong start -c <kong.conf> --vv
 ```
 
 # Install Deck

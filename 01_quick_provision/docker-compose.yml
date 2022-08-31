@@ -21,15 +21,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB_NAME}
     ports:
       - "${POSTGRES_DB_PORT}:5432"
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     volumes:
-      #- ./database-script/init.sql:/docker-entrypoint-initdb.d/init.sql
       - kong_database:/var/lib/postgresql/data
-      #- ./datastore/konggw/postgres:/var/lib/postgresql/data
 
   #######################################
   # Kong database migration
@@ -37,7 +30,6 @@ services:
   kong-migration:
     image: kong/kong-gateway:2.8.0.0-alpine
     container_name: kong-migration
-    #entrypoint: sh -c "sleep 10 && kong migrations up"
     entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
     networks:
       - kong-net
@@ -61,10 +53,11 @@ services:
     container_name: kong-gateway
     networks:
       - kong-net
-    # volumes:
-    #   - ./kong-configuration/kong_declarative_conf.yml:/usr/local/kong/declarative/kong.yml
+    volumes:
+      - ./kong-conf/certs/domain/kong-apigw.local.net.crt:/home/kong/kong-apigw.local.net.crt
+      - ./kong-conf/certs/domain/kong-apigw.local.net.key:/home/kong/kong-apigw.local.net.key
+      - ./kong-conf/kong.conf:/etc/kong/kong.conf
     environment:
-        #KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
         KONG_DATABASE: postgres #Type of database
         KONG_PG_HOST: kong-database #container link name
         KONG_PG_DATABASE: ${POSTGRES_DB_NAME}
@@ -76,9 +69,8 @@ services:
         KONG_ADMIN_ERROR_LOG: ${KONG_ADMIN_ERROR_LOG}
         KONG_ADMIN_LISTEN: ${KONG_ADMIN_LISTEN}
         KONG_ADMIN_GUI_URL: http://localhost:8002
-        KONG_NGINX_PROXY_REAL_IP_HEADER: X-Forwarded-For
-        KONG_TRUSTED_IPS: 0.0.0.0/0,::/0
-        KONG_REAL_IP_RECURSIVE: "on"
+        KONG_SSL_CERT: /home/kong/kong-apigw.local.net.crt
+        KONG_SSL_CERT_KEY: /home/kong/kong-apigw.local.net.key
     restart: always
     ports:
       - 8000:8000
