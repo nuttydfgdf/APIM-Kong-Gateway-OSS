@@ -17,10 +17,44 @@ openssl s_client -connect kong-apigw.local.net:8443
 
 
 ## OAuth Client Credential
-curl --insecure -X POST https://localhost:8443/httpbin/oauth2/token \
-   -H "Content-Type: application/x-www-form-urlencoded" \
-   -d "grant_type=client_credentials&client_id=demo-app&client_secret=1234" 
+### Pre-requisite
 
+### Pre-requisite: Create a Consumer/Developer
+You need to associate a credential to an existing Consumer object. To create a Consumer, you can execute the following request:
+```
+curl -vk -X POST https://localhost:8444/consumers/ \
+  --data "username=DeveloperA" \
+  --data "custom_id=SOME_CUSTOM_ID"
+```
+
+### Pre-requisite: Create an Application
+Then you can finally provision new OAuth 2.0 credentials (also called “OAuth applications”) by making the following HTTP request:
+```
+curl -vk -X POST https://localhost:8444/consumers/DeveloperA/oauth2 \
+  --data "name=demo-app" \
+  --data "client_id=demo-app" \
+  --data "client_secret=1234" \
+  --data "redirect_uris=http://some-domain/endpoint/" \
+  --data "hash_secret=true"
+```
+
+### Try to get OAuth token OAuth 2.0 Flows : Client Credentials
+Using a POST request, set Content-Type to application/x-www-form-urlencoded and send the credentials as form data:
+```
+curl -ivk -X POST 'https://localhost:8443/httpbin/oauth2/token' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'client_id=demo-app' \
+  --data-urlencode 'client_secret=1234' \
+  --data-urlencode 'grant_type=client_credentials'
+```
+> Kong can apply OAuth2 each service/route. In this case we apply plugin at route [httpbin-secure]
+
+
+### Viewing and Invalidating Access Tokens by Admin API
+Active tokens can be listed and modified using the Admin API. A GET on the /oauth2_tokens endpoint returns the following:
+```
+curl -ivk GET https://localhost:8444/oauth2_tokens/
+```
 
 ## Simple Loadtest
 Get token 
