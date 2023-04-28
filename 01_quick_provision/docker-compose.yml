@@ -71,6 +71,7 @@ services:
         KONG_ADMIN_GUI_URL: http://localhost:8002
         KONG_SSL_CERT: /home/kong/kong-apigw.local.net.crt
         KONG_SSL_CERT_KEY: /home/kong/kong-apigw.local.net.key
+        KONG_NGINX_HTTP_LOG_FORMAT : ${KONG_NGINX_HTTP_LOG_FORMAT}
     restart: always
     ports:
       - 8000:8000
